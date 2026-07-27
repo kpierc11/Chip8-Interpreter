@@ -196,6 +196,8 @@ int main(int argc, char *argv[])
 
             if (opcode == 0x00EE)
             {
+                cpuRegisters.programCounter = cpuRegisters.stack[0];
+                cpuRegisters.programCounter -= 1;
             }
             break;
 
@@ -205,18 +207,33 @@ int main(int argc, char *argv[])
 
         case 0x2:
 
+            cpuRegisters.stackPointer++;
+            cpuRegisters.stack[0] = cpuRegisters.programCounter;
+            cpuRegisters.programCounter = NNN;
+
             break;
 
         case 0x3:
 
+            if (cpuRegisters.V[vxRegister] == NN)
+            {
+                cpuRegisters.programCounter += 2;
+            }
+
             break;
 
         case 0x4:
-
+            if (cpuRegisters.V[vxRegister] != cpuRegisters.V[vyRegister])
+            {
+                cpuRegisters.programCounter += 2;
+            }
             break;
 
         case 0x5:
-
+            if (cpuRegisters.V[vxRegister] == cpuRegisters.V[vyRegister])
+            {
+                cpuRegisters.programCounter += 2;
+            }
             break;
 
         case 0x6:
@@ -228,15 +245,62 @@ int main(int argc, char *argv[])
             break;
 
         case 0x8:
-
+            if (N == 0)
+            {
+                cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister];
+            }
+            if (N == 1)
+            {
+                uint16_t result = cpuRegisters.V[vxRegister] | cpuRegisters.V[vyRegister];
+                cpuRegisters.V[vxRegister] = result;
+            }
+            if (N == 2)
+            {
+                uint16_t result = cpuRegisters.V[vxRegister] & cpuRegisters.V[vyRegister];
+                cpuRegisters.V[vxRegister] = result;
+            }
+            if (N == 3)
+            {
+                uint16_t result = cpuRegisters.V[vxRegister] ^ cpuRegisters.V[vyRegister];
+                cpuRegisters.V[vxRegister] = result;
+            }
+            if (N == 4)
+            {
+                cpuRegisters.V[vyRegister] += cpuRegisters.V[vxRegister];
+            }
+            if (N == 5)
+            {
+                cpuRegisters.V[vyRegister] -= cpuRegisters.V[vxRegister];
+            }
+            if (N == 6)
+            {
+                uint16_t result = cpuRegisters.V[vyRegister] << 1;
+                cpuRegisters.V[vxRegister] = result;
+            }
+            if (N == 7)
+            {
+                cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister] - cpuRegisters.V[vxRegister];
+            }
+            if (N == 0xE)
+            {
+                uint16_t result = cpuRegisters.V[vyRegister] << 1;
+                cpuRegisters.V[vxRegister] = result;
+            }
             break;
 
         case 0x9:
-
+            if (cpuRegisters.V[vxRegister] != cpuRegisters.V[vyRegister])
+            {
+                cpuRegisters.programCounter += 2;
+            }
             break;
 
         case 0xA:
             cpuRegisters.I = NNN;
+            break;
+
+        case 0xB:
+            cpuRegisters.programCounter = NNN + cpuRegisters.V[0];
             break;
 
         case 0xD:
