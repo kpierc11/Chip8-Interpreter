@@ -23,7 +23,7 @@ struct Chip8Registers
     uint16_t programCounter;
 
     // Points to top most level of stack
-    uint8_t *stackPointer;
+    uint8_t stackPointer;
 
     // Used to store addresses for subroutines
     uint16_t stack[16];
@@ -58,11 +58,7 @@ int main(int argc, char *argv[])
 
         };
 
-    std::println("Memory Block Size: {}", sizeof(memoryBuffer));
-
     Chip8Registers cpuRegisters;
-
-    // registers.stackPointer = memoryBuffer;
 
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -78,7 +74,7 @@ int main(int argc, char *argv[])
         "An SDL3 window",
         640,
         320,
-        SDL_WINDOW_OPENGL);
+        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
     if (!window)
     {
@@ -97,7 +93,7 @@ int main(int argc, char *argv[])
     }
 
     // Read Rom file
-    ifstream romFile("roms/4-flags.ch8", ios::binary);
+    ifstream romFile("roms/danm8ku.ch8", ios::binary);
 
     char ch;
 
@@ -135,6 +131,8 @@ int main(int argc, char *argv[])
 
     const float pixelSize = 10.0f;
 
+    uint8_t currentKeyValue = 0;
+
     while (!done)
     {
         SDL_Event event;
@@ -145,9 +143,82 @@ int main(int argc, char *argv[])
             {
                 done = true;
             }
+
+            if (event.type == SDL_EVENT_KEY_UP)
+            {
+                currentKeyValue = 0x0;
+            }
+
+            if (event.type == SDL_EVENT_KEY_DOWN)
+            {
+                if (event.key.key == SDLK_0)
+                {
+                    currentKeyValue = 0x0;
+                }
+                if (event.key.key == SDLK_1)
+                {
+                    currentKeyValue = 0x1;
+                }
+                if (event.key.key == SDLK_2)
+                {
+                    currentKeyValue = 0x2;
+                }
+                if (event.key.key == SDLK_3)
+                {
+                    currentKeyValue = 0x3;
+                }
+                if (event.key.key == SDLK_4)
+                {
+                    currentKeyValue = 0x4;
+                }
+                if (event.key.key == SDLK_5)
+                {
+                    currentKeyValue = 0x5;
+                }
+                if (event.key.key == SDLK_6)
+                {
+                    currentKeyValue = 0x6;
+                }
+                if (event.key.key == SDLK_7)
+                {
+                    currentKeyValue = 0x7;
+                }
+                if (event.key.key == SDLK_8)
+                {
+                    currentKeyValue = 0x8;
+                }
+                if (event.key.key == SDLK_9)
+                {
+                    currentKeyValue = 0x9;
+                }
+                if (event.key.key == SDLK_A)
+                {
+                    currentKeyValue = 0xA;
+                }
+                if (event.key.key == SDLK_B)
+                {
+                    currentKeyValue = 0xB;
+                }
+                if (event.key.key == SDLK_C)
+                {
+                    currentKeyValue = 0xC;
+                }
+                if (event.key.key == SDLK_D)
+                {
+                    currentKeyValue = 0xD;
+                }
+                if (event.key.key == SDLK_E)
+                {
+                    currentKeyValue = 0xE;
+                }
+                if (event.key.key == SDLK_F)
+                {
+                    currentKeyValue = 0xF;
+                }
+            }
         }
 
-        SDL_SetRenderDrawColor(renderer, 135, 206, 235, 255);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
         // // Fetch instructions
@@ -160,17 +231,17 @@ int main(int argc, char *argv[])
         uint8_t NN = opcode & 0xFF;
         uint8_t N = opcode & 0x0F;
 
-        if (cpuRegisters.programCounter < length + 0x200)
-        {
-            cpuRegisters.programCounter += 2;
-            // println("Full Opcode: {:04X}", opcode);
-            // println("First opcode nibble: {:X}", firstOpcodeNibble);
-            // println("NN: {:02X}", NN);
-            // println("Vx Register: {:X}", vxRegister);
-            // println("Vy Register: {:X}", vyRegister);
-            // println("NNN: {:03X}", NNN);
-            // println("N: {:X}", N);
-        }
+        // if (cpuRegisters.programCounter < length + 0x200)
+        // {
+        cpuRegisters.programCounter += 2;
+        // println("Full Opcode: {:04X}", opcode);
+        // println("First opcode nibble: {:X}", firstOpcodeNibble);
+        // println("NN: {:02X}", NN);
+        // println("Vx Register: {:X}", vxRegister);
+        // println("Vy Register: {:X}", vyRegister);
+        // println("NNN: {:03X}", NNN);
+        // println("N: {:X}", N);
+        //}
 
         switch (firstOpcodeNibble)
         {
@@ -187,8 +258,8 @@ int main(int argc, char *argv[])
 
             if (opcode == 0x00EE)
             {
-                cpuRegisters.programCounter = cpuRegisters.stack[0];
-                cpuRegisters.stackPointer -= 1;
+                cpuRegisters.programCounter = cpuRegisters.stack[cpuRegisters.stackPointer];
+                cpuRegisters.stackPointer--;
             }
             break;
 
@@ -197,11 +268,9 @@ int main(int argc, char *argv[])
             break;
 
         case 0x2:
-
             cpuRegisters.stackPointer++;
-            cpuRegisters.stack[0] = cpuRegisters.programCounter;
+            cpuRegisters.stack[cpuRegisters.stackPointer] = cpuRegisters.programCounter;
             cpuRegisters.programCounter = NNN;
-
             break;
 
         case 0x3:
@@ -235,7 +304,6 @@ int main(int argc, char *argv[])
             break;
 
         case 0x8:
-         println("Opcodes: {:X}", opcode);
             if (N == 0x0)
             {
                 cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister];
@@ -255,6 +323,7 @@ int main(int argc, char *argv[])
             if (N == 0x4)
             {
                 uint16_t result = cpuRegisters.V[vxRegister] + cpuRegisters.V[vyRegister];
+                cpuRegisters.V[vxRegister] = static_cast<uint8_t>(result);
 
                 if (result > 0xFF)
                 {
@@ -264,14 +333,12 @@ int main(int argc, char *argv[])
                 {
                     cpuRegisters.V[0xF] = 0;
                 }
-                cpuRegisters.V[vxRegister] = static_cast<uint8_t>(result);
-
             }
             if (N == 0x5)
             {
-                cpuRegisters.V[vxRegister] -= cpuRegisters.V[vyRegister];
-
-                if (cpuRegisters.V[vxRegister] < 0)
+                int16_t result = cpuRegisters.V[vxRegister] - cpuRegisters.V[vyRegister];
+                cpuRegisters.V[vxRegister] = static_cast<uint8_t>(result);
+                if (result < 0)
                 {
                     cpuRegisters.V[0xF] = 0;
                 }
@@ -282,31 +349,29 @@ int main(int argc, char *argv[])
             }
             if (N == 0x6)
             {
-                cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister];
-                cpuRegisters.V[vxRegister] >> 1;
-
-                uint8_t shiftedBit = cpuRegisters.V[vxRegister] >> 1;
-
-                cpuRegisters.V[0xf] = shiftedBit;
+                bitset<8> byte = cpuRegisters.V[vyRegister];
+                cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister] >> 1;
+                cpuRegisters.V[0xf] = byte[0];
             }
             if (N == 0x7)
             {
-                cpuRegisters.V[0xf] = cpuRegisters.V[vyRegister] & 0x0F;
-                cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister] - cpuRegisters.V[vxRegister];
+                int16_t result = cpuRegisters.V[vyRegister] - cpuRegisters.V[vxRegister];
+                cpuRegisters.V[vxRegister] = static_cast<uint8_t>(result);
 
-                if (cpuRegisters.V[vxRegister] < 0)
+                if (result < 0)
                 {
-                    cpuRegisters.V[0xf] = 0;
+                    cpuRegisters.V[0xF] = 0;
                 }
                 else
                 {
-                    cpuRegisters.V[0xf] = 1;
+                    cpuRegisters.V[0xF] = 1;
                 }
             }
             if (N == 0xE)
             {
-                cpuRegisters.V[0xf] = (cpuRegisters.V[vyRegister] >> 12) & 0xF;
+                bitset<8> byte = cpuRegisters.V[vyRegister];
                 cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister] << 1;
+                cpuRegisters.V[0xF] = byte[7];
             }
             break;
 
@@ -349,18 +414,15 @@ int main(int argc, char *argv[])
                     pixel.position.y = static_cast<float>(yCor) * 10.0f;
                     if (bits[j])
                     {
-
                         pixel.position.h = pixelSize;
                         pixel.position.w = pixelSize;
-                        pixel.color = {65, 105, 225, 255};
-                        cpuRegisters.V[0xf] = 1;
+                        pixel.color = {255, 255, 255, 255};
                     }
                     else
                     {
                         pixel.position.h = pixelSize;
                         pixel.position.w = pixelSize;
-                        pixel.color = {135, 206, 235, 255};
-                        cpuRegisters.V[0xf] = 0;
+                        pixel.color = {0, 0, 0, 255};
                     }
 
                     xCor += 1.0f;
@@ -380,10 +442,19 @@ int main(int argc, char *argv[])
         case 0xE:
             if (NN == 0x9E)
             {
+
+                if (currentKeyValue == cpuRegisters.V[vxRegister])
+                {
+                    cpuRegisters.programCounter += 2;
+                }
             }
 
             if (NN == 0xA1)
             {
+                if (currentKeyValue != cpuRegisters.V[vxRegister])
+                {
+                    cpuRegisters.programCounter += 2;
+                }
             }
             break;
 
@@ -394,6 +465,7 @@ int main(int argc, char *argv[])
             }
             if (NN == 0x0A)
             {
+               cpuRegisters.V[vxRegister] = currentKeyValue;
             }
             if (NN == 0x15)
             {
