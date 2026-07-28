@@ -117,8 +117,6 @@ int main(int argc, char *argv[])
 
     while (romFile.get(ch))
     {
-        // std::println("{:02x}", ch);
-        //   load program data into memory
         memoryBuffer[programEntryPoint++] = static_cast<int>(ch);
     }
 
@@ -126,13 +124,6 @@ int main(int argc, char *argv[])
 
     // Set the program counter initial address
     cpuRegisters.programCounter = 0x200;
-
-    // uint16_t opcode = static_cast<uint16_t>((memoryBuffer[cpuRegisters.programCounter]) << 8) | memoryBuffer[cpuRegisters.programCounter + 1];
-    // uint8_t firstOpcodeByte = opcode & 0x0F;
-    // uint16_t lastChunkOpcode = opcode & 0x0FFF;
-    // uint16_t registerNum = opcode & 0x0F00;
-
-    // println("Register Number: {:X}", registerNum);
 
     struct Pixel
     {
@@ -156,7 +147,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_SetRenderDrawColor(renderer, 135, 206, 235, 255);
         SDL_RenderClear(renderer);
 
         // // Fetch instructions
@@ -164,10 +155,10 @@ int main(int argc, char *argv[])
 
         uint8_t firstOpcodeNibble = (opcode >> 12) & 0xF;
         uint16_t NNN = opcode & 0xFFF;
-        uint16_t vxRegister = (opcode >> 8) & 0x0F;
-        uint16_t vyRegister = (opcode >> 4) & 0x0F;
-        uint16_t NN = opcode & 0xFF;
-        uint16_t N = opcode & 0x0F;
+        uint8_t vxRegister = (opcode >> 8) & 0x0F;
+        uint8_t vyRegister = (opcode >> 4) & 0x0F;
+        uint8_t NN = opcode & 0xFF;
+        uint8_t N = opcode & 0x0F;
 
         if (cpuRegisters.programCounter < length + 0x200)
         {
@@ -244,46 +235,78 @@ int main(int argc, char *argv[])
             break;
 
         case 0x8:
-            if (N == 0)
+         println("Opcodes: {:X}", opcode);
+            if (N == 0x0)
             {
                 cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister];
             }
-            if (N == 1)
+            if (N == 0x1)
             {
-                uint16_t result = cpuRegisters.V[vxRegister] | cpuRegisters.V[vyRegister];
-                cpuRegisters.V[vxRegister] = result;
+                cpuRegisters.V[vxRegister] |= cpuRegisters.V[vyRegister];
             }
-            if (N == 2)
+            if (N == 0x2)
             {
-                uint16_t result = cpuRegisters.V[vxRegister] & cpuRegisters.V[vyRegister];
-                cpuRegisters.V[vxRegister] = result;
+                cpuRegisters.V[vxRegister] &= cpuRegisters.V[vyRegister];
             }
-            if (N == 3)
+            if (N == 0x3)
             {
-                uint16_t result = cpuRegisters.V[vxRegister] ^ cpuRegisters.V[vyRegister];
-                cpuRegisters.V[vxRegister] = result;
+                cpuRegisters.V[vxRegister] ^= cpuRegisters.V[vyRegister];
             }
-            if (N == 4)
+            if (N == 0x4)
             {
-                cpuRegisters.V[vyRegister] += cpuRegisters.V[vxRegister];
+                uint16_t result = cpuRegisters.V[vxRegister] + cpuRegisters.V[vyRegister];
+
+                if (result > 0xFF)
+                {
+                    cpuRegisters.V[0xF] = 1;
+                }
+                else
+                {
+                    cpuRegisters.V[0xF] = 0;
+                }
+                cpuRegisters.V[vxRegister] = static_cast<uint8_t>(result);
+
             }
-            if (N == 5)
+            if (N == 0x5)
             {
-                cpuRegisters.V[vyRegister] -= cpuRegisters.V[vxRegister];
+                cpuRegisters.V[vxRegister] -= cpuRegisters.V[vyRegister];
+
+                if (cpuRegisters.V[vxRegister] < 0)
+                {
+                    cpuRegisters.V[0xF] = 0;
+                }
+                else
+                {
+                    cpuRegisters.V[0xF] = 1;
+                }
             }
-            if (N == 6)
+            if (N == 0x6)
             {
-                uint16_t result = cpuRegisters.V[vyRegister] << 1;
-                cpuRegisters.V[vxRegister] = result;
+                cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister];
+                cpuRegisters.V[vxRegister] >> 1;
+
+                uint8_t shiftedBit = cpuRegisters.V[vxRegister] >> 1;
+
+                cpuRegisters.V[0xf] = shiftedBit;
             }
-            if (N == 7)
+            if (N == 0x7)
             {
+                cpuRegisters.V[0xf] = cpuRegisters.V[vyRegister] & 0x0F;
                 cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister] - cpuRegisters.V[vxRegister];
+
+                if (cpuRegisters.V[vxRegister] < 0)
+                {
+                    cpuRegisters.V[0xf] = 0;
+                }
+                else
+                {
+                    cpuRegisters.V[0xf] = 1;
+                }
             }
             if (N == 0xE)
             {
-                uint16_t result = cpuRegisters.V[vyRegister] << 1;
-                cpuRegisters.V[vxRegister] = result;
+                cpuRegisters.V[0xf] = (cpuRegisters.V[vyRegister] >> 12) & 0xF;
+                cpuRegisters.V[vxRegister] = cpuRegisters.V[vyRegister] << 1;
             }
             break;
 
@@ -304,10 +327,10 @@ int main(int argc, char *argv[])
 
         case 0xD:
         {
-            println("Full Draw Opcode {:X}", opcode);
+            // println("Full Draw Opcode {:X}", opcode);
 
-            cout << std::hex << cpuRegisters.I << "\n";
-            cout << std::hex << cpuRegisters.I + N << "\n";
+            // cout << std::hex << cpuRegisters.I << "\n";
+            // cout << std::hex << cpuRegisters.I + N << "\n";
             uint16_t xCor = cpuRegisters.V[vxRegister];
             uint16_t yCor = cpuRegisters.V[vyRegister];
 
@@ -317,10 +340,10 @@ int main(int argc, char *argv[])
 
                 bitset<8> bits(byte);
 
-                for (int j = 7; j >= 0; --j)
+                for (short j = 7; j >= 0; --j)
                 {
                     Pixel pixel;
-                    cout << bits[j];
+                    // cout << bits[j];
 
                     pixel.position.x = static_cast<float>(xCor) * 10.0f;
                     pixel.position.y = static_cast<float>(yCor) * 10.0f;
@@ -329,14 +352,14 @@ int main(int argc, char *argv[])
 
                         pixel.position.h = pixelSize;
                         pixel.position.w = pixelSize;
-                        pixel.color = {255, 255, 255, 255};
+                        pixel.color = {65, 105, 225, 255};
                         cpuRegisters.V[0xf] = 1;
                     }
                     else
                     {
                         pixel.position.h = pixelSize;
                         pixel.position.w = pixelSize;
-                        pixel.color = {0, 0, 0, 255};
+                        pixel.color = {135, 206, 235, 255};
                         cpuRegisters.V[0xf] = 0;
                     }
 
@@ -345,12 +368,12 @@ int main(int argc, char *argv[])
                 }
                 xCor = cpuRegisters.V[vxRegister];
                 yCor += 1.0f;
-                cout << " " << "\n";
+                // cout << " " << "\n";
             }
 
-            println("X cord {}", xCor);
-            println("Y Cord {}", yCor);
-            println("cmd: display Draw ");
+            // println("X cord {}", xCor);
+            // println("Y Cord {}", yCor);
+            // println("cmd: display Draw ");
         }
         break;
 
@@ -391,13 +414,41 @@ int main(int argc, char *argv[])
             if (NN == 0x33)
             {
                 uint16_t value = cpuRegisters.V[vxRegister];
-                uint16_t ones = value / 100;
+                uint8_t hundreds = value / 100;
+                uint8_t tens = (value / 10) % 10;
+                uint8_t ones = value % 10;
+
+                memoryBuffer[cpuRegisters.I] = hundreds;
+                memoryBuffer[cpuRegisters.I + 1] = tens;
+                memoryBuffer[cpuRegisters.I + 2] = ones;
             }
             if (NN == 0x55)
             {
+                uint16_t start = cpuRegisters.I;
+                for (auto &reg : cpuRegisters.V)
+                {
+                    memoryBuffer[start] = reg;
+
+                    if (reg == cpuRegisters.V[vxRegister])
+                    {
+                        break;
+                    }
+                    start++;
+                }
             }
             if (NN == 0x65)
             {
+                uint16_t start = cpuRegisters.I;
+                for (auto &reg : cpuRegisters.V)
+                {
+                    reg = memoryBuffer[start];
+
+                    if (reg == cpuRegisters.V[vxRegister])
+                    {
+                        break;
+                    }
+                    start++;
+                }
             }
             break;
         }
