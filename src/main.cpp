@@ -76,8 +76,8 @@ int main(int argc, char *argv[])
 
     window = SDL_CreateWindow(
         "An SDL3 window",
-        1000,
-        1000,
+        640,
+        320,
         SDL_WINDOW_OPENGL);
 
     if (!window)
@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
     }
 
     // Read Rom file
-    ifstream romFile("roms/1-chip8-logo.ch8", ios::binary);
+    ifstream romFile("roms/4-flags.ch8", ios::binary);
 
     char ch;
 
@@ -197,7 +197,7 @@ int main(int argc, char *argv[])
             if (opcode == 0x00EE)
             {
                 cpuRegisters.programCounter = cpuRegisters.stack[0];
-                cpuRegisters.programCounter -= 1;
+                cpuRegisters.stackPointer -= 1;
             }
             break;
 
@@ -219,11 +219,10 @@ int main(int argc, char *argv[])
             {
                 cpuRegisters.programCounter += 2;
             }
-
             break;
 
         case 0x4:
-            if (cpuRegisters.V[vxRegister] != cpuRegisters.V[vyRegister])
+            if (cpuRegisters.V[vxRegister] != NN)
             {
                 cpuRegisters.programCounter += 2;
             }
