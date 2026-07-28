@@ -76,8 +76,8 @@ int main(int argc, char *argv[])
 
     window = SDL_CreateWindow(
         "An SDL3 window",
-        640,
-        320,
+        1000,
+        1000,
         SDL_WINDOW_OPENGL);
 
     if (!window)
@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
     }
 
     // Read Rom file
-    ifstream romFile("roms/ibm.ch8", ios::binary);
+    ifstream romFile("roms/1-chip8-logo.ch8", ios::binary);
 
     char ch;
 
@@ -304,6 +304,7 @@ int main(int argc, char *argv[])
             break;
 
         case 0xD:
+        {
             println("Full Draw Opcode {:X}", opcode);
 
             cout << std::hex << cpuRegisters.I << "\n";
@@ -317,7 +318,7 @@ int main(int argc, char *argv[])
 
                 bitset<8> bits(byte);
 
-                for (size_t j = bits.size() - 1; j > 0; --j)
+                for (int j = 7; j >= 0; --j)
                 {
                     Pixel pixel;
                     cout << bits[j];
@@ -351,6 +352,54 @@ int main(int argc, char *argv[])
             println("X cord {}", xCor);
             println("Y Cord {}", yCor);
             println("cmd: display Draw ");
+        }
+        break;
+
+        case 0xE:
+            if (NN == 0x9E)
+            {
+            }
+
+            if (NN == 0xA1)
+            {
+            }
+            break;
+
+        case 0xF:
+            if (NN == 0x07)
+            {
+                cpuRegisters.V[vxRegister] = cpuRegisters.delayTimer;
+            }
+            if (NN == 0x0A)
+            {
+            }
+            if (NN == 0x15)
+            {
+                cpuRegisters.delayTimer = cpuRegisters.V[vxRegister];
+            }
+            if (NN == 0x18)
+            {
+                cpuRegisters.soundTimer = cpuRegisters.V[vxRegister];
+            }
+            if (NN == 0x1E)
+            {
+                cpuRegisters.I += cpuRegisters.V[vxRegister];
+            }
+            if (NN == 0x29)
+            {
+                cpuRegisters.I = cpuRegisters.V[vxRegister];
+            }
+            if (NN == 0x33)
+            {
+                uint16_t value = cpuRegisters.V[vxRegister];
+                uint16_t ones = value / 100;
+            }
+            if (NN == 0x55)
+            {
+            }
+            if (NN == 0x65)
+            {
+            }
             break;
         }
         // Decode
