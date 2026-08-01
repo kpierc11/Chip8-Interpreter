@@ -6,59 +6,95 @@ import std;
 
 using namespace std;
 
+Uint64 previousFrameTime = SDL_GetTicks();
+float lagDelay = 0.0f;
+float framesPerSecond = 0.0f;
+int counter = 0;
+constexpr int ROWS = 64;
+constexpr int COLUMNS = 32;
+constexpr uint16_t PROGRAM_START = 0x200;
+
+// The chip 8 is capable fo up  to 4KB (4096 bytes) of Ram from location 0x0000
+unsigned char memoryBuffer[4096] =
+    {
+        // Font
+        0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+        0x20, 0x60, 0x20, 0x20, 0x70, // 1
+        0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+        0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+        0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+        0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+        0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+        0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+        0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+        0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+        0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+        0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+        0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+        0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+        0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+        0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+
+};
+
 // The chip 8 has 16 8 bit registers Vx where x is a hexadecmimal digit through F. There is also a 16-bit register called I. This register is generally used to store memory addresses, so only the lowest (rightmost) 12 bits are usually used.
 struct Chip8Registers
 {
     // General purpose 8 bit registers
-    uint8_t V[16];
+    uint8_t V[16]{};
 
     // Used to store memory addresses only the lowest rightmost 12 bits are used.
-    uint16_t I;
+    uint16_t I = 0;
 
     // When these registers are non-zero they are automatically decremented at a rate of 60Hz
-    uint8_t delayTimer;
-    uint8_t soundTimer;
+    uint8_t delayTimer = 0;
+    uint8_t soundTimer = 0;
 
     // Stores the current executing address
-    uint16_t programCounter;
+    uint16_t programCounter = 0;
 
     // Points to top most level of stack
-    uint8_t stackPointer;
+    uint8_t stackPointer = 0;
 
     // Used to store addresses for subroutines
-    uint16_t stack[16];
+    uint16_t stack[16]{};
 };
 
-void readROM()
+bool LoadRom(std::string filePath)
 {
+    // Read Rom file
+    ifstream romFile(filePath, ios::binary);
+
+    char ch;
+
+    if (!romFile)
+    {
+        println("Couldn't read file");
+        return false;
+    }
+
+    romFile.seekg(0, romFile.end);
+    int length = romFile.tellg();
+    romFile.seekg(0, romFile.beg);
+
+    println("Length of file: {}", length);
+
+    int programEntryPoint = PROGRAM_START;
+
+    while (romFile.get(ch))
+    {
+        memoryBuffer[programEntryPoint++] = static_cast<int>(ch);
+    }
+
+    romFile.close();
+
+    return true;
 }
 
 int main(int argc, char *argv[])
 {
-    // The chip 8 is capable fo up  to 4KB (4096 bytes) of Ram from location 0x0000
-    unsigned char memoryBuffer[4096] =
-        {
-            // Font
-            0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-            0x20, 0x60, 0x20, 0x20, 0x70, // 1
-            0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-            0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-            0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-            0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-            0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-            0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-            0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-            0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-            0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-            0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-            0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-            0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-            0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-            0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 
-        };
-
-    Chip8Registers cpuRegisters;
+    Chip8Registers cpuRegisters{};
 
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -92,44 +128,17 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Read Rom file
-    ifstream romFile("roms/danm8ku.ch8", ios::binary);
+    SDL_SetRenderLogicalPresentation(renderer, 640, 320, SDL_LOGICAL_PRESENTATION_DISABLED);
 
-    char ch;
-
-    if (!romFile)
+    if(!LoadRom("roms/1-chip8-logo.ch8"))
     {
-        println("Couldn't read file");
         return 1;
     }
 
-    romFile.seekg(0, romFile.end);
-    int length = romFile.tellg();
-    romFile.seekg(0, romFile.beg);
-
-    println("Length of file: {}", length);
-
-    int programEntryPoint = 0x200;
-
-    while (romFile.get(ch))
-    {
-        memoryBuffer[programEntryPoint++] = static_cast<int>(ch);
-    }
-
-    romFile.close();
-
     // Set the program counter initial address
-    cpuRegisters.programCounter = 0x200;
+    cpuRegisters.programCounter = PROGRAM_START;
 
-    struct Pixel
-    {
-        SDL_FRect position;
-        SDL_Color color;
-    };
-
-    vector<Pixel> pixels;
-
-    const float pixelSize = 10.0f;
+    vector<uint8_t> pixels(ROWS * COLUMNS, 0);
 
     uint8_t currentKeyValue = 0;
 
@@ -218,9 +227,6 @@ int main(int argc, char *argv[])
             }
         }
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer);
-
         // // Fetch instructions
         uint16_t opcode = static_cast<uint16_t>((memoryBuffer[cpuRegisters.programCounter]) << 8) | memoryBuffer[cpuRegisters.programCounter + 1];
 
@@ -231,17 +237,7 @@ int main(int argc, char *argv[])
         uint8_t NN = opcode & 0xFF;
         uint8_t N = opcode & 0x0F;
 
-        // if (cpuRegisters.programCounter < length + 0x200)
-        // {
         cpuRegisters.programCounter += 2;
-        // println("Full Opcode: {:04X}", opcode);
-        // println("First opcode nibble: {:X}", firstOpcodeNibble);
-        // println("NN: {:02X}", NN);
-        // println("Vx Register: {:X}", vxRegister);
-        // println("Vy Register: {:X}", vyRegister);
-        // println("NNN: {:03X}", NNN);
-        // println("N: {:X}", N);
-        //}
 
         switch (firstOpcodeNibble)
         {
@@ -252,7 +248,7 @@ int main(int argc, char *argv[])
             {
                 for (auto &pixel : pixels)
                 {
-                    pixel.color = {0, 0, 0, 255};
+                    pixel = 0;
                 }
             }
 
@@ -392,50 +388,52 @@ int main(int argc, char *argv[])
 
         case 0xD:
         {
-            // println("Full Draw Opcode {:X}", opcode);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            SDL_RenderClear(renderer);
 
-            // cout << std::hex << cpuRegisters.I << "\n";
-            // cout << std::hex << cpuRegisters.I + N << "\n";
             uint16_t xCor = cpuRegisters.V[vxRegister];
             uint16_t yCor = cpuRegisters.V[vyRegister];
 
+            cpuRegisters.V[0xF] = 0;
+
             for (uint16_t i = cpuRegisters.I; i < cpuRegisters.I + N; i++)
             {
-                uint8_t byte = memoryBuffer[i];
+                uint8_t sprite = memoryBuffer[i];
 
-                bitset<8> bits(byte);
+                bitset<8> drawData(sprite);
 
                 for (short j = 7; j >= 0; --j)
                 {
-                    Pixel pixel;
-                    // cout << bits[j];
+                    uint8_t currentPixel = pixels[yCor * COLUMNS + xCor];
 
-                    pixel.position.x = static_cast<float>(xCor) * 10.0f;
-                    pixel.position.y = static_cast<float>(yCor) * 10.0f;
-                    if (bits[j])
+                    if (drawData[j] && currentPixel == 1)
                     {
-                        pixel.position.h = pixelSize;
-                        pixel.position.w = pixelSize;
-                        pixel.color = {255, 255, 255, 255};
+                        pixels[yCor * COLUMNS + xCor] = 0;
+                        cpuRegisters.V[0xF] = 01;
                     }
-                    else
+                    else if (drawData[j])
                     {
-                        pixel.position.h = pixelSize;
-                        pixel.position.w = pixelSize;
-                        pixel.color = {0, 0, 0, 255};
+                        pixels[yCor * COLUMNS + xCor] = 1;
                     }
 
-                    xCor += 1.0f;
-                    pixels.push_back(pixel);
+                    xCor++;
                 }
                 xCor = cpuRegisters.V[vxRegister];
-                yCor += 1.0f;
-                // cout << " " << "\n";
+                yCor++;
             }
 
-            // println("X cord {}", xCor);
-            // println("Y Cord {}", yCor);
-            // println("cmd: display Draw ");
+            for (int y = 0; y < ROWS; y++)
+            {
+                for (int x = 0; x < COLUMNS; x++)
+                {
+                    Uint8 color = pixels[y * COLUMNS + x] ? 255 : 0;
+                    SDL_SetRenderDrawColor(renderer, color, color, color, 255);
+                    SDL_RenderPoint(renderer, x, y);
+                }
+            }
+
+            //   Execute
+            SDL_RenderPresent(renderer);
         }
         break;
 
@@ -465,7 +463,7 @@ int main(int argc, char *argv[])
             }
             if (NN == 0x0A)
             {
-               cpuRegisters.V[vxRegister] = currentKeyValue;
+                cpuRegisters.V[vxRegister] = currentKeyValue;
             }
             if (NN == 0x15)
             {
@@ -524,16 +522,23 @@ int main(int argc, char *argv[])
             }
             break;
         }
-        // Decode
 
-        for (Pixel &pixel : pixels)
+        Uint64 currentFrameTime = SDL_GetTicks();
+
+        float deltaTime = (currentFrameTime - previousFrameTime) / 1000.0f;
+
+        previousFrameTime = currentFrameTime;
+
+        lagDelay += deltaTime;
+
+        if (lagDelay >= 0.016f)
         {
-            SDL_SetRenderDrawColor(renderer, pixel.color.r, pixel.color.g, pixel.color.b, pixel.color.a);
-            SDL_RenderFillRect(renderer, &pixel.position);
+            if (cpuRegisters.delayTimer > 0)
+            {
+                cpuRegisters.delayTimer--;
+            }
+            lagDelay -= 0.016f;
         }
-
-        //   Execute
-        SDL_RenderPresent(renderer);
     }
 
     // Close and destroy the window
