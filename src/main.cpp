@@ -13,9 +13,11 @@ int counter = 0;
 constexpr int ROWS = 64;
 constexpr int COLUMNS = 32;
 constexpr uint16_t PROGRAM_START = 0x200;
+constexpr uint16_t BUFFER_SIZE = 4096;
+constexpr const char *ROM_FILE = "roms/6-keypad.ch8";
 
 // The chip 8 is capable fo up  to 4KB (4096 bytes) of Ram from location 0x0000
-unsigned char memoryBuffer[4096] =
+unsigned char memoryBuffer[BUFFER_SIZE] =
     {
         // Font
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -65,7 +67,7 @@ bool LoadRom(std::string filePath)
     // Read Rom file
     ifstream romFile(filePath, ios::binary);
 
-    char ch;
+    unsigned char ch;
 
     if (!romFile)
     {
@@ -79,15 +81,20 @@ bool LoadRom(std::string filePath)
 
     println("Length of file: {}", length);
 
-    int programEntryPoint = PROGRAM_START;
-
-    while (romFile.get(ch))
+    if (PROGRAM_START + length > BUFFER_SIZE)
     {
-        memoryBuffer[programEntryPoint++] = static_cast<int>(ch);
+        return false;
     }
 
-    romFile.close();
+    romFile.read(reinterpret_cast<char *>(&memoryBuffer[PROGRAM_START]), length);
 
+    if (!romFile)
+    {
+        println("Failed to read ROM.");
+        return false;
+    }
+
+    println("Loaded {} bytes", length);
     return true;
 }
 
@@ -128,10 +135,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    SDL_SetRenderLogicalPresentation(renderer, 640, 320, SDL_LOGICAL_PRESENTATION_DISABLED);
+    SDL_SetRenderLogicalPresentation(renderer, 64, 32, SDL_LOGICAL_PRESENTATION_STRETCH);
 
-    if(!LoadRom("roms/1-chip8-logo.ch8"))
+    if (!LoadRom(ROM_FILE))
     {
+        std::println(stderr, "Error: Failed to open file '{}'.", ROM_FILE);
         return 1;
     }
 
@@ -140,7 +148,7 @@ int main(int argc, char *argv[])
 
     vector<uint8_t> pixels(ROWS * COLUMNS, 0);
 
-    uint8_t currentKeyValue = 0;
+    uint8_t currentKeyValue = NULL;
 
     while (!done)
     {
@@ -155,7 +163,7 @@ int main(int argc, char *argv[])
 
             if (event.type == SDL_EVENT_KEY_UP)
             {
-                currentKeyValue = 0x0;
+                currentKeyValue = 0;
             }
 
             if (event.type == SDL_EVENT_KEY_DOWN)
@@ -307,14 +315,17 @@ int main(int argc, char *argv[])
             if (N == 0x1)
             {
                 cpuRegisters.V[vxRegister] |= cpuRegisters.V[vyRegister];
+                // cpuRegisters.V[0xF] = 0;
             }
             if (N == 0x2)
             {
                 cpuRegisters.V[vxRegister] &= cpuRegisters.V[vyRegister];
+                // cpuRegisters.V[0xF] = 0;
             }
             if (N == 0x3)
             {
                 cpuRegisters.V[vxRegister] ^= cpuRegisters.V[vyRegister];
+                // cpuRegisters.V[0xF] = 0;
             }
             if (N == 0x4)
             {
@@ -394,9 +405,7 @@ int main(int argc, char *argv[])
             uint16_t xCor = cpuRegisters.V[vxRegister];
             uint16_t yCor = cpuRegisters.V[vyRegister];
 
-            cpuRegisters.V[0xF] = 0;
-
-            for (uint16_t i = cpuRegisters.I; i < cpuRegisters.I + N; i++)
+            for (uint16_t i = cpuRegisters.I; i < cpuRegisters.I + N; ++i)
             {
                 uint8_t sprite = memoryBuffer[i];
 
@@ -404,16 +413,22 @@ int main(int argc, char *argv[])
 
                 for (short j = 7; j >= 0; --j)
                 {
-                    uint8_t currentPixel = pixels[yCor * COLUMNS + xCor];
+                    int index = (xCor * COLUMNS + yCor) - 1;
 
-                    if (drawData[j] && currentPixel == 1)
+                    if (index < ROWS * COLUMNS)
                     {
-                        pixels[yCor * COLUMNS + xCor] = 0;
-                        cpuRegisters.V[0xF] = 01;
-                    }
-                    else if (drawData[j])
-                    {
-                        pixels[yCor * COLUMNS + xCor] = 1;
+                        uint8_t currentPixel = pixels[index];
+
+                        if (drawData[j] && currentPixel == 1)  
+                        {
+                            pixels[index] = 0;
+                            cpuRegisters.V[0xF] = 1;
+                        }
+                        else if (drawData[j])
+                        {
+                            pixels[index] = 1;
+                            cpuRegisters.V[0xF] = 0;
+                        }
                     }
 
                     xCor++;
@@ -422,11 +437,11 @@ int main(int argc, char *argv[])
                 yCor++;
             }
 
-            for (int y = 0; y < ROWS; y++)
+            for (int x = 0; x < ROWS; x++)
             {
-                for (int x = 0; x < COLUMNS; x++)
+                for (int y = 0; y < COLUMNS; y++)
                 {
-                    Uint8 color = pixels[y * COLUMNS + x] ? 255 : 0;
+                    Uint8 color = pixels[x * COLUMNS + y] ? 255 : 0;
                     SDL_SetRenderDrawColor(renderer, color, color, color, 255);
                     SDL_RenderPoint(renderer, x, y);
                 }
