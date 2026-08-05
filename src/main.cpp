@@ -42,9 +42,9 @@ constexpr int ROWS = 64;
 constexpr int COLUMNS = 32;
 constexpr uint16_t PROGRAM_START = 0x200;
 constexpr uint16_t BUFFER_SIZE = 4096;
-constexpr float MS_TARGET = 1.0f / 60.0f;
+constexpr float MS_TARGET = 1.0f / 80.0f;
 vector<uint8_t> pixels(ROWS *COLUMNS, 0);
-constexpr const char *ROM_FILE = "roms/5-quirks.ch8";
+constexpr const char *ROM_FILE = "roms/2-ibm-logo.ch8";
 
 // The chip 8 is capable fo up  to 4KB (4096 bytes) of Ram from location 0x0000
 unsigned char memoryBuffer[BUFFER_SIZE] =
@@ -369,6 +369,8 @@ void handleOpcodes()
 
             bitset<8> drawData(sprite);
 
+            cpuRegisters.V[0xF] = 0;
+
             for (short j = 7; j >= 0; --j)
             {
                 int index = (xCor * COLUMNS + yCor);
@@ -385,7 +387,6 @@ void handleOpcodes()
                     else if (drawData[j])
                     {
                         pixels[index] = 1;
-                        cpuRegisters.V[0xF] = 0;
                     }
                 }
 
@@ -394,6 +395,19 @@ void handleOpcodes()
             xCor = cpuRegisters.V[vxRegister];
             yCor++;
         }
+
+        for (int x = 0; x < ROWS; x++)
+        {
+            for (int y = 0; y < COLUMNS; y++)
+            {
+                Uint8 color = pixels[x * COLUMNS + y] ? 255 : 0;
+                SDL_SetRenderDrawColor(renderer, color, color, color, 255);
+                SDL_RenderPoint(renderer, x, y);
+            }
+        }
+
+        //   Execute
+        SDL_RenderPresent(renderer);
     }
     break;
 
@@ -532,7 +546,6 @@ int main(int argc, char *argv[])
 
         handleInput();
 
-        // Calculate Delta Time
         Uint64 currentFrameTime = SDL_GetTicks();
 
         float deltaTime = (currentFrameTime - previousFrameTime) / 1000.0f;
@@ -545,7 +558,6 @@ int main(int argc, char *argv[])
 
         while (lagDelay >= MS_TARGET)
         {
-            // Set Timers
             if (cpuRegisters.delayTimer > 0)
             {
                 cpuRegisters.delayTimer--;
@@ -558,20 +570,6 @@ int main(int argc, char *argv[])
 
             lagDelay -= MS_TARGET;
         }
-
-        // Render
-        for (int x = 0; x < ROWS; x++)
-        {
-            for (int y = 0; y < COLUMNS; y++)
-            {
-                Uint8 color = pixels[x * COLUMNS + y] ? 255 : 0;
-                SDL_SetRenderDrawColor(renderer, color, color, color, 255);
-                SDL_RenderPoint(renderer, x, y);
-            }
-        }
-
-        //   Execute
-        SDL_RenderPresent(renderer);
     }
 
     // Close and destroy the window
