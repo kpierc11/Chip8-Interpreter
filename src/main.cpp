@@ -2,6 +2,7 @@
 #include <SDL3/SDL_main.h>
 #include <fstream>
 #include <bitset>
+#include <iomanip>
 import std;
 
 using namespace std;
@@ -34,17 +35,19 @@ SDL_Window *window;
 SDL_Renderer *renderer;
 Uint64 previousFrameTime = SDL_GetTicks();
 float lagDelay = 0.0f;
+float cpuLag = 0.0f;
 float framesPerSecond = 0.0f;
 int counter = 0;
 bool done = false;
-uint8_t currentKeyValue = NULL;
+uint8_t currentKeyValue = 0x0FF;
 constexpr int ROWS = 64;
 constexpr int COLUMNS = 32;
 constexpr uint16_t PROGRAM_START = 0x200;
 constexpr uint16_t BUFFER_SIZE = 4096;
-constexpr float MS_TARGET = 1.0f / 80.0f;
+constexpr float MS_TARGET = 1.0f / 60.0f;
+constexpr float CPU_STEP = 1.0f / 400.0f;
 vector<uint8_t> pixels(ROWS *COLUMNS, 0);
-constexpr const char *ROM_FILE = "roms/2-ibm-logo.ch8";
+constexpr const char *ROM_FILE = "roms/games/glitchGhost.ch8";
 
 // The chip 8 is capable fo up  to 4KB (4096 bytes) of Ram from location 0x0000
 unsigned char memoryBuffer[BUFFER_SIZE] =
@@ -74,7 +77,7 @@ bool LoadRom(std::string filePath)
     // Read Rom file
     ifstream romFile(filePath, ios::binary);
 
-    unsigned char ch;
+    char ch;
 
     if (!romFile)
     {
@@ -90,6 +93,7 @@ bool LoadRom(std::string filePath)
 
     if (PROGRAM_START + length > BUFFER_SIZE)
     {
+        println("Program To Large");
         return false;
     }
 
@@ -102,6 +106,7 @@ bool LoadRom(std::string filePath)
     }
 
     println("Loaded {} bytes", length);
+    romFile.close();
     return true;
 }
 
@@ -371,7 +376,7 @@ void handleOpcodes()
 
             cpuRegisters.V[0xF] = 0;
 
-            for (short j = 7; j >= 0; --j)
+            for (short j = 7; j > 0; --j)
             {
                 int index = (xCor * COLUMNS + yCor);
 
@@ -437,8 +442,14 @@ void handleOpcodes()
         }
         if (NN == 0x0A)
         {
-            cpuRegisters.V[vxRegister] = currentKeyValue;
-            println("current key value: {}", currentKeyValue);
+            if (currentKeyValue == 0xFF)
+            {
+                cpuRegisters.programCounter -= 2;
+            }
+            else
+            {
+                cpuRegisters.V[vxRegister] = currentKeyValue;
+            }
         }
         if (NN == 0x15)
         {
@@ -454,7 +465,7 @@ void handleOpcodes()
         }
         if (NN == 0x29)
         {
-            cpuRegisters.I = cpuRegisters.V[vxRegister];
+            cpuRegisters.I = cpuRegisters.V[vxRegister] * 5;
         }
         if (NN == 0x33)
         {
@@ -470,29 +481,19 @@ void handleOpcodes()
         if (NN == 0x55)
         {
             uint16_t start = cpuRegisters.I;
-            for (auto &reg : cpuRegisters.V)
-            {
-                memoryBuffer[start] = reg;
 
-                if (reg == cpuRegisters.V[vxRegister])
-                {
-                    break;
-                }
-                start++;
+            for (uint8_t i = 0; i <= vxRegister; i++)
+            {
+                memoryBuffer[start + i] = cpuRegisters.V[i];
             }
         }
         if (NN == 0x65)
         {
             uint16_t start = cpuRegisters.I;
-            for (auto &reg : cpuRegisters.V)
-            {
-                reg = memoryBuffer[start];
 
-                if (reg == cpuRegisters.V[vxRegister])
-                {
-                    break;
-                }
-                start++;
+            for (uint8_t i = 0; i <= vxRegister; i++)
+            {
+                cpuRegisters.V[i] = memoryBuffer[start + i];
             }
         }
         break;
@@ -544,17 +545,22 @@ int main(int argc, char *argv[])
     while (!done)
     {
 
-        handleInput();
-
         Uint64 currentFrameTime = SDL_GetTicks();
 
         float deltaTime = (currentFrameTime - previousFrameTime) / 1000.0f;
 
         previousFrameTime = currentFrameTime;
 
+        cpuLag += deltaTime;
         lagDelay += deltaTime;
 
+        handleInput();
+
+        // while (cpuLag >= CPU_STEP)
+        // {
         handleOpcodes();
+        //     cpuLag -= CPU_STEP;
+        // }
 
         while (lagDelay >= MS_TARGET)
         {
