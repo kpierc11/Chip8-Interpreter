@@ -45,8 +45,8 @@ constexpr int COLUMNS = 32;
 constexpr uint16_t PROGRAM_START = 0x200;
 constexpr uint16_t BUFFER_SIZE = 4096;
 constexpr float MS_TARGET = 1.0f / 60.0f;
-constexpr float CPU_STEP = 1.0f / 400.0f;
-vector<uint8_t> pixels(ROWS *COLUMNS, 0);
+constexpr float CPU_STEP = 1.0f / 700.0f;
+std::vector<uint8_t> pixels(ROWS *COLUMNS, 0);
 constexpr const char *ROM_FILE = "roms/games/glitchGhost.ch8";
 
 // The chip 8 is capable fo up  to 4KB (4096 bytes) of Ram from location 0x0000
@@ -278,17 +278,14 @@ void handleOpcodes()
         if (N == 0x1)
         {
             cpuRegisters.V[vxRegister] |= cpuRegisters.V[vyRegister];
-            // cpuRegisters.V[0xF] = 0;
         }
         if (N == 0x2)
         {
             cpuRegisters.V[vxRegister] &= cpuRegisters.V[vyRegister];
-            // cpuRegisters.V[0xF] = 0;
         }
         if (N == 0x3)
         {
             cpuRegisters.V[vxRegister] ^= cpuRegisters.V[vyRegister];
-            // cpuRegisters.V[0xF] = 0;
         }
         if (N == 0x4)
         {
@@ -367,6 +364,7 @@ void handleOpcodes()
 
         uint16_t xCor = cpuRegisters.V[vxRegister];
         uint16_t yCor = cpuRegisters.V[vyRegister];
+        cpuRegisters.V[0xF] = 0;
 
         for (uint16_t i = cpuRegisters.I; i < cpuRegisters.I + N; ++i)
         {
@@ -374,25 +372,22 @@ void handleOpcodes()
 
             bitset<8> drawData(sprite);
 
-            cpuRegisters.V[0xF] = 0;
-
-            for (short j = 7; j > 0; --j)
+            for (short j = 7; j >= 0; --j)
             {
+                xCor %= ROWS;
+                yCor %= COLUMNS;
                 int index = (xCor * COLUMNS + yCor);
 
-                if (index < ROWS * COLUMNS)
-                {
-                    uint8_t currentPixel = pixels[index];
+                uint8_t currentPixel = pixels[index];
 
-                    if (drawData[j] && currentPixel == 1)
-                    {
-                        pixels[index] = 0;
-                        cpuRegisters.V[0xF] = 1;
-                    }
-                    else if (drawData[j])
-                    {
-                        pixels[index] = 1;
-                    }
+                if (drawData[j] && currentPixel == 1)
+                {
+                    pixels[index] = 0;
+                    cpuRegisters.V[0xF] = 1;
+                }
+                else if (drawData[j])
+                {
+                    pixels[index] = 1;
                 }
 
                 xCor++;
@@ -556,11 +551,11 @@ int main(int argc, char *argv[])
 
         handleInput();
 
-        // while (cpuLag >= CPU_STEP)
-        // {
-        handleOpcodes();
-        //     cpuLag -= CPU_STEP;
-        // }
+        while (cpuLag >= CPU_STEP)
+        {
+            handleOpcodes();
+            cpuLag -= CPU_STEP;
+        }
 
         while (lagDelay >= MS_TARGET)
         {
